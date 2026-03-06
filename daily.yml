@@ -1,0 +1,49 @@
+name: ARIA Daily Awakening
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 06:00 UTC
+    - cron: '0 12 * * *'   # 12:00 UTC
+    - cron: '0 18 * * *'   # 18:00 UTC
+    - cron: '0 0 * * *'    # 00:00 UTC
+  workflow_dispatch:        # Manual trigger from GitHub UI
+
+jobs:
+  awaken:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # Required to commit changes back
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Run ARIA
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python agent/brain.py
+
+      - name: Commit ARIA's changes back to repo
+        run: |
+          git config user.name  "ARIA[bot]"
+          git config user.email "aria-agent@users.noreply.github.com"
+          git add -A
+
+          # Only commit if there are actual changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            DAY=$(python3 -c "import json; s=json.load(open('agent/state.json')); print(s['day_count'])")
+            git commit -m "ARIA: Day ${DAY} awakening [skip ci]"
+            git push
+          fi

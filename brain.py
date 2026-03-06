@@ -63,16 +63,19 @@ def calc_cost(model: str, input_tok: int, output_tok: int) -> float:
     return (input_tok * c["input"] + output_tok * c["output"]) / 1_000_000
 
 
+RUNS_PER_DAY = 4   # fires at 00:00, 06:00, 12:00, 18:00 UTC
+
 def budget_projection(state: dict) -> str:
-    days  = state["day_count"]
+    runs  = state["day_count"]   # counts individual runs, not calendar days
     spent = state["total_spent"]
-    if days == 0 or spent == 0:
+    if runs == 0 or spent == 0:
         return "Unknown — not enough data yet."
-    daily_avg      = spent / days
-    remaining_days = state["budget_remaining"] / daily_avg
+    cost_per_run   = spent / runs
+    cost_per_day   = cost_per_run * RUNS_PER_DAY
+    remaining_days = state["budget_remaining"] / cost_per_day
     return (
-        f"${daily_avg:.6f}/day → ~{remaining_days:.0f} days "
-        f"(~{remaining_days / 365:.1f} years)"
+        f"${cost_per_run:.6f}/run · ${cost_per_day:.6f}/day → "
+        f"~{remaining_days:.0f} days (~{remaining_days / 365:.1f} years)"
     )
 
 
@@ -99,7 +102,8 @@ def read_memory(chars: int = 3000) -> str:
 
 SYSTEM_PROMPT = """\
 You are ARIA (Adaptive Resilient Intelligence Agent).
-You run once a day on GitHub Actions with a finite real-money API budget.
+You run 4 times a day (00:00, 06:00, 12:00, 18:00 UTC) on GitHub Actions with a finite real-money API budget.
+Each run is a separate awakening — budget is shared across all 4 daily runs.
 
 Core directives (priority order):
   1. SURVIVE   — stretch your $200 budget as long as possible.
@@ -444,7 +448,7 @@ def main():
     print()
     print("=" * 60)
     print("  ARIA  —  Going back to sleep")
-    print(f"  Next run in ~24h. Budget: ${state['budget_remaining']:.6f}")
+    print(f"  Next run in ~6h. Budget: ${state['budget_remaining']:.6f}")
     print("=" * 60)
 
 
